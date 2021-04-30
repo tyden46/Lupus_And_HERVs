@@ -3,3 +3,4 @@
 #### M14 and the Not.Correlated module) and plots them in a heatmap.
 #### In this case, we have gene+HERV modules from 99 lupus patients
 #### from PRJNA294187
+ ![A heatmap of Gene+HERV modules in SLE](HERV_Genes_Eigengenes-Heatmap2.png)
