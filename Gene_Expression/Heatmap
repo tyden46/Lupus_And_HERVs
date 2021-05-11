@@ -1,0 +1,101 @@
+#### Author: Tyson Dawson
+#### Work in progress
+
+library(ComplexHeatmap)
+library(RColorBrewer)
+library(dplyr)
+library(ComplexHeatmap)
+library(DESeq2)
+library(sva)
+setwd("C:/Users/tyson/OneDrive/Desktop/Genomics Core Projects/Tavares/updatedSamples")
+
+heatMapGenes=read.csv("Six1PlusPlus_vs_Six1PlusMinus.csv")
+
+myTable=read.table("Tavares-counts.txt",header=TRUE)
+counts.data <- mutate_all(myTable[,c(7:length(colnames(myTable)))], function(x) as.numeric(as.character(x)))
+MeanB=rowMeans(counts.data[,c(1,5,8,11)])
+MeanA=rowMeans(counts.data[,c(2,4,7,10)])
+MeanC=rowMeans(counts.data[,c(3,6,9,12)])
+TableMeans=as.data.frame(cbind(MeanA,MeanB,MeanC))
+colnames(TableMeans)=c("Plus_Plus","Plus_Minus","Minus_Minus")
+rownames(counts.data)=myTable$Geneid
+### Cross reference the counts data with sample meta data
+
+
+#metastuff$WHO <- as.factor(metastuff$WHO)
+counts.data[is.na(counts.data)] <- 0
+counts.data=counts.data[,c(2,1,3,4,5,6,7,8,9,10,11,12)]
+DISEASE=c("A","B","C","A","B","C","A","B","C","A","B","C")
+metastuff=data.frame(DISEASE)
+metastuff$DISEASE <- as.factor(DISEASE) #44- SLE, 44-CTL
+colnames(counts.data)=c("D","B","F","G","H","I","J","K",
+                        "L","M","N","O")
+dataset_noNA <- data.matrix(counts.data) #Must be matrix, not dataframe
+class(dataset_noNA) <- "numeric" ##ComBat-seq doesn't allow non-numeric data
+batch <- c(rep(0, 9),rep(1, 3))
+myGroup=metastuff$DISEASE
+counts.data <- ComBat_seq(dataset_noNA, batch=batch, group=myGroup)
+
+genesOfInterest=counts.data[which(row.names(counts.data) %in% heatMapGenes[1:50,1]),]
+matchIDX=match(heatMapGenes[1:50,1],row.names(genesOfInterest))
+genesOfInterest=genesOfInterest[matchIDX,]
+genesOfInterest=log10(genesOfInterest)
+#pdf(file="Heatmap-PlusPlusvsPlusMinus.pdf", height=2, width=2)
+Heatmap(as.matrix(genesOfInterest), name = "mat2", 
+        #column_split = split,
+        #top_annotation = ha, 
+        column_title = NULL,col=colorRampPalette(brewer.pal(9,"Blues"))(100),cluster_rows = FALSE,cluster_columns = TRUE,
+        column_names_gp = gpar(fontsize = 8),row_names_gp = gpar(fontsize=2))
+#dev.off()
+
+vstCounts=varianceStabilizingTransformation(as.matrix(counts.data[which(row.names(counts.data) %in% heatMapGenes[1:50,1]),]),fitType = "parametric")
+mycolors=c(rev(colorRampPalette(brewer.pal(9,"Blues"))(100)),colorRampPalette(brewer.pal(9,"Reds"))(100))
+library(circlize)
+col_fun = colorRamp2(c(-5, 0, 5), c("blue", "white", "red"))
+#pdf(file="RLogHeatmapPlusPlusPlusMinus.pdf", height=6, width=6)
+Heatmap(as.matrix(genesOfInterest), name = "log10CountValue", 
+        #column_split = split,
+        #top_annotation = ha,
+        border=T,
+        border_gp=gpar(col="black", lwd=0.001),
+        #rect_gp = gpar(col = "black", lwd = 0.001),
+        heatmap_width = unit(1,"in"),
+        #left_annotation = rowAnnotation(logFoldChange = heatMapGenes$log2FoldChange,
+                                        #col = list(logFoldChange = col_fun),
+                                        #simple_anno_size = unit(0.1, "cm")),
+        #left_annotation = rowAnnotation(foo=1:432),
+        column_title = NULL,col=mycolors,cluster_rows = F,cluster_columns = TRUE,
+        column_names_gp = gpar(fontsize = 6),row_names_gp = gpar(fontsize=1)) #+ rowAnnotation(logFoldChange = runif(432,0,432),                                                                                            #col = list(bar = c("a" = "red", "b" = "green", "c" = "blue")))
+#dev.off()
+
+pdf(file="VSTHeatmap.pdf", height=4, width=6)
+Heatmap(as.matrix(vstCounts), name = "VST Transformed Count Value", 
+        #column_split = split,
+        #top_annotation = ha, 
+        column_title = NULL,col=colorRamp2(c(2, 11, 20), c("blue", "white", "red")),cluster_rows = TRUE,cluster_columns = TRUE,
+        column_names_gp = gpar(fontsize = 8),row_names_gp = gpar(fontsize=5))
+dev.off()
+
+TableMeans[is.na(TableMeans)] <- 0
+
+genesOfInterest=TableMeans[which(row.names(TableMeans) %in% heatMapGenes[1:50,1]),]
+matchIDX=match(heatMapGenes[1:50,1],row.names(genesOfInterest))
+genesOfInterest=genesOfInterest[matchIDX,]
+genesOfInterest=log10(genesOfInterest)
+
+row.names(TableMeans)=row.names(counts.data)
+
+TableMeans=round(TableMeans)
+vstCounts=varianceStabilizingTransformation(as.matrix(TableMeans[which(row.names(TableMeans) %in% heatMapGenes[c(1:50),1]),]),fitType = "parametric")
+mycolors=c(rev(colorRampPalette(brewer.pal(9,"Blues"))(100)),colorRampPalette(brewer.pal(9,"Reds"))(100))
+library(circlize)
+col_fun = colorRamp2(c(-5, 0, 5), c("blue", "white", "red"))
+
+pdf(file="VSTHeatmap-Means.pdf", height=4, width=6)
+Heatmap(as.matrix(vstCounts), name = "VST Transformed Count Value", 
+        #column_split = split,
+        #top_annotation = ha, 
+        column_title = NULL,col=colorRamp2(c(2, 11, 20), c("blue", "white", "red")),cluster_rows = TRUE,cluster_columns = TRUE,
+        column_names_gp = gpar(fontsize = 8),row_names_gp = gpar(fontsize=5))
+dev.off()
+
